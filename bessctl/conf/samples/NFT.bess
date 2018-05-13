@@ -1,0 +1,16 @@
+import scapy.all as scapy
+
+# Craft a packet with the specified IP addresses
+def gen_packet(proto, src_ip, dst_ip):
+    eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
+    ip = scapy.IP(src=src_ip, dst=dst_ip)
+    udp = proto(sport=10001, dport=10002)
+    payload = 'helloworld'
+    pkt = eth/ip/udp/payload
+    return bytes(pkt)
+
+packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),]
+
+c::Classifier(version=0)
+
+Source() -> Rewrite(templates=packets) -> c -> Sink()

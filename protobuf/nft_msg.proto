@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package bess.nft;
+
+import "util_msg.proto";
+
+message ClassifierArg {
+    uint32 version=1;
+}
+
+message ForwarderArg {
+    uint32 type=1;
+}

@@ -96,4 +96,4 @@ void ACL::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   }
 }
 
-ADD_MODULE(ACL, "acl", "ACL module from NetBricks")
+ADD_MODULE(ACL, "acl1", "ACL module from NetBricks")
