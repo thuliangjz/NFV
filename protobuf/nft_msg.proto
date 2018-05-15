@@ -4,8 +4,23 @@ package bess.nft;
 
 import "util_msg.proto";
 
-message ClassifierArg {
-    uint32 version=1;
+message EmptyArg {
+
+}
+
+message ClsArg {
+}
+
+message ClsAddSpecArg {
+    message Spec {
+        string src_ip = 1;    /// Source IP block in CIDR. Wildcard if "".
+        string dst_ip = 2;    /// Destination IP block in CIDR. Wildcard if "".
+        uint32 src_port = 3;  /// TCP/UDP source port. Wildcard if 0.
+        uint32 dst_port = 4;  /// TCP/UDP Destination port. Wildcard if 0.
+        bool is_postcard = 5;  //是否使用postcard模式进行测量，postcard模式与INFT模式二选一
+        repeated uint32 tele_type = 6;  //测量码序列
+    }
+    repeated Spec specs = 1;
 }
 
 message ForwarderArg {

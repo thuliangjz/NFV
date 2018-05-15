@@ -69,3 +69,6 @@ htmlcov
 # VM images and SSH keys
 vm.key
 vm.qcow2
+
+#copy proto file script
+get_proto.sh
