@@ -4,6 +4,9 @@
 #include "../utils/ip.h"
 #include "../utils/udp.h"
 
+using bess::utils::Ethernet;
+using bess::utils::Ipv4;
+using bess::utils::Udp;
 
 //各个参数的意义:在交互式环境(python)下调用Command时的函数，传入参数在protobuf中定义的名称，处理函数，是否是线程安全的
 
@@ -48,10 +51,6 @@ CommandResponse Classifier::Clear(const bess::nft::EmptyArg& arg){
 //TODO: 当前假定所有的数据包都是Eth/IP4/UDP格式
 void Classifier::ProcessBatch(Context* ctx, bess::PacketBatch *batch){
     //下面使用的结构体都是定义在utils中的同名.h文件下
-    using bess::utils::Ethernet;
-    using bess::utils::Ipv4;
-    using bess::utils::Udp;
-
     int cnt_pkt = batch->cnt();
     for(int i = 0; i < cnt_pkt; ++i){
         //如果数据包match某个传入的spec，则在数据包中添加测量包
@@ -73,17 +72,14 @@ void Classifier::ProcessBatch(Context* ctx, bess::PacketBatch *batch){
 }
 
 void Classifier::InsertProtocol(bess::Packet* pkt, Classifier::TelemetrySpec& spec){
+    uint16_t len_original = pkt->data_len();
+    pkt->set_data_len(len_original + LENGTH_INFT);
+    pkt->set_total_len(len_original + LENGTH_INFT);
+    char *ptr = pkt->buffer<char*>() + pkt->data_off();
+    memmove(ptr + _offset_insert + LENGTH_INFT, 
+        ptr + _offset_insert, LENGTH_INFT);
     //在数据包的IP_Options处直接添加测量的数据包
-    char *ptr = pkt->buffer<char*>() + SNBUF_HEADROOM;
-    int size = static_cast<int>pkt->data_len(), i = 0;
-    //留出空隙
-    for(; i < this->_offset_insert; ++i) {
-        _buffer[i] = ptr[i];
-    }
-    for(; i < size; ++i) {
-        _buffer[i + LENGTH_INFT] = ptr[i];
-    }
-    INFTHeader *h = reinterpret_cast<INFTHeader*>(_buffer + _offset_insert);
+    INFTHeader *h = reinterpret_cast<INFTHeader*>(ptr + _offset_insert);
     h->preamble = MAGIC_NFT;
     h->version = 0;
     if(!spec.is_postcard){
@@ -98,11 +94,10 @@ void Classifier::InsertProtocol(bess::Packet* pkt, Classifier::TelemetrySpec& sp
         h->is_postcard = 1;
     }
     h->length = 0;
-    
-    //buffer中的数据重新拷贝到数据包中
-    pkt->set_data_off(SNBUF_HEADROOM);
-    pkt->set_total_len(size + LENGTH_INFT);
-    bess::utils::CopyInlined(ptr, _buffer, size + LENGTH_INFT, true);
+    //修改IP header的长度
+    Ethernet *eth = pkt->head_data<Ethernet *>();
+    Ipv4 *ip = reinterpret_cast<Ipv4 *>(eth + 1);
+    ip->header_length = 15;
 }
 
 ADD_MODULE(Classifier, "classifier", "classifier for NFT architecture") 

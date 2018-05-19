@@ -72,3 +72,6 @@ vm.qcow2
 
 #copy proto file script
 get_proto.sh
+
+#code
+.vscode
