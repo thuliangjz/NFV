@@ -24,7 +24,7 @@ class Forwarder final : public Module {
         CommandResponse SetProtoRWPos(const bess::nft::FwdSetProtoRWPosArg &arg);
         CommandResponse SetPostcard(const bess::nft::FwdSetPostcardArg& arg);
         CommandResponse AddGateGroup(const bess::nft::FwdAddGateGroupArg& arg);
-        CommandResponse ClearGateGroup(const bess::nft::EmptyArg& arg);
+        CommandResponse ClearGateGroup(const bess::nft::NFTEmptyArg& arg);
 
         void ProcessBatch(Context* ctx, bess::PacketBatch* batch) override;
 

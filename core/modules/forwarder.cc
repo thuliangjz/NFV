@@ -66,7 +66,7 @@ CommandResponse Forwarder::AddGateGroup(const bess::nft::FwdAddGateGroupArg &arg
     return CommandSuccess();
 }
 
-CommandResponse Forwarder::ClearGateGroup(const bess::nft::EmptyArg&){
+CommandResponse Forwarder::ClearGateGroup(const bess::nft::NFTEmptyArg&){
     _gate_groups.clear();
     return CommandSuccess();
 }

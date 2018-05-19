@@ -46,7 +46,7 @@ CommandResponse Classifier::AddTeleSpec(const bess::nft::ClsAddSpecArg& arg){
     return CommandSuccess();
 }
 
-CommandResponse Classifier::Clear(const bess::nft::EmptyArg&){
+CommandResponse Classifier::Clear(const bess::nft::NFTEmptyArg&){
     _specs.clear();
     return CommandSuccess();
 }

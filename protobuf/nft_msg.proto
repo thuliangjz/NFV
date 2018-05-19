@@ -4,7 +4,7 @@ package bess.nft;
 
 import "util_msg.proto";
 
-message EmptyArg {
+message NFTEmptyArg {
 
 }
 

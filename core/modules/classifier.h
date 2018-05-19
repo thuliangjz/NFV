@@ -40,7 +40,7 @@ class Classifier final : public Module {
 
         //添加规则的命令
         CommandResponse AddTeleSpec(const bess::nft::ClsAddSpecArg& arg);
-        CommandResponse Clear(const bess::nft::EmptyArg& arg);    //用于清除所有的Spec
+        CommandResponse Clear(const bess::nft::NFTEmptyArg& arg);    //用于清除所有的Spec
     private:
         bool classify(bess::Packet* pkt);
         void InsertProtocol(bess::Packet* pkt, TelemetrySpec& spec); //根据会更新spec的内容 
