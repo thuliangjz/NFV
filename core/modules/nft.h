@@ -10,6 +10,8 @@
 //INFT协议开头的preamble，含义是0x7f N F T
 #define MAGIC_NFT 0x7f4e4654
 
+#define PROTO_TYPE_ETH 0
+
 #define METRIC_LATENCY 0
 #define METRIC_RATE_I_P 1
 #define METRIC_RATE_I_B 2
@@ -18,6 +20,7 @@
 #define FORWARDER_MAX_IGATE 16
 #define FORWARDER_MAX_EGATE 17
 #define FORWARDER_POSTCARD_GATE 16
+
 
 struct [[gnu::packed]] INFTHeader {
     uint32_t preamble;

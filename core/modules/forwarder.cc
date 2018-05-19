@@ -1,69 +1,16 @@
 #include "forwarder.h"
 
-//以下所有内容都应该拷贝到forwarder.h中
-#include <map>
-#include<queue>
-#include "../module.h"
-#include "nft.h"
-#include "../pb/nft_msg.pb.h"
+#include"../utils/ether.h"
+#include"../utils/ip.h"
+#include"../utils/udp.h"
+#include"../utils/copy.h"
 
-
-#define IGATE_T 0
-#define EGATE_T 1
-
-#define FORWARDER_BUFFER_SIZE 1048576
-
-class Forwarder final : public Module {
-    public:
-        Forwarder(): Module(){}
-        static const Commands cmds;
-        CommandResponse Init(const bess::nft::FwdArg &arg);
-        CommandResponse SetProtoRWPos(const bess::nft::FwdSetProtoRWPosArg &arg);
-        CommandResponse SetPostcard(const bess::nft::FwdSetPostcardArg& arg);
-        CommandResponse AddGateGroup(const bess::nft::FwdAddGateGroupArg& arg);
-        CommandResponse ClearGateGroup(const bess::nft::EmptyArg& arg);
-
-        void ProcessBatch(Context* ctx, bess::PacketBatch* batch) override;
-
-        //生成postcard的task
-        struct task_result RunTask(Context* ctx, bess::PacketBatch *batch, void *arg);
-
-        //支持多个gate，入口有16个，出口17个，除了和入口对应的镜像出口外，还有一个用于发送postcard的出口(编号15)
-        static const gate_idx_t kNumOGates = FORWARDER_MAX_EGATE;
-        static const gate_idx_t kNumIGates = FORWARDER_MAX_IGATE;
-
-        struct GateGroup {
-            uint8_t report_id;      //实际上report_id只有4位可以使用，即必须是0-15之间的值
-            uint8_t type;           //镜像组是进forwarder还是出forwarder
-            uint32_t read_pos;      //读取INFT header的位置
-            uint32_t write_pos;     //写入INFT header的位置
-            uint32_t delimi_pos;    //生成postcard是截断位置(不包含INFT_protocol)
-            uint32_t proto_type;    //包头的第一层协议类型
-
-            //统计数据
-            int count_pkt;
-            int count_bytes;
-            double reset_time;
-            int reset_interval;
-        };
-    private:
-        void GeneratePostcard(gate_idx_t gate,bess::Packet* pkt, uint64_t leave_time);
-        void TagTimeStamp(gate_idx_t gate, bess::Packet* pkt, uint64_t arrive_time);       //在入口处打上时间戳
-        void WriteTimeStamp(gate_idx_t gate, bess::Packet *pkt, uint64_t leave_time);    //出口处计算时间戳
-        void WriteRate(gate_idx_t gate, bess::Packet *pkt, uint16_t metric);         //标出出口数目
-        void RewriteCheck(gate_idx_t gate, bess::Packet *pkt);      //在将包发出去之前检查是否需要移动INFT协议的位置
-
-        void CopyPacketHeader(gate_idx_t gate, char* dst, bess::Packet *pkt);
-        INFTHeader* GetINFTHeader(gate_idx_t gate, bess::Packet *pkt);
-
-        std::map<gate_idx_t, struct GateGroup> _gate_groups;
-        char _postcard_buffer[BUFFER_SIZE];
-        int _buffer_start, _buffer_end;
-        queue<pair<int, int>> _que_pkts;        //buffer中保留_que_pkts的指针
-        uint32_t _seq_postcard_nxt;
-        uint8_t _id;
-        char _rewrite_buffer[LENGTH_INFT];
-};
+using bess::utils::Ethernet;
+using bess::utils::Ipv4;
+using bess::utils::Udp;
+using bess::utils::Copy;
+using bess::utils::CopyInlined;
+using std::min;
 
 const Commands Forwarder::cmds = {
     {"set_proto_rw_pos", "SetProtoRWPos",
@@ -73,7 +20,7 @@ const Commands Forwarder::cmds = {
      {"add_gate_group", "AddGateGroup", 
      MODULE_CMD_FUNC(&Forwarder::AddGateGroup), Command::THREAD_UNSAFE},
      {"clear_gate_group", "ClearGateGroup", 
-     MODULE_CMD_FUNC(&Forwarder::ClearGateGroup), Command::THREAD_UNSAFE},
+     MODULE_CMD_FUNC(&Forwarder::ClearGateGroup), Command::THREAD_UNSAFE}
 };
 
 CommandResponse Forwarder::SetProtoRWPos(const bess::nft::FwdSetProtoRWPosArg &arg){
@@ -96,7 +43,7 @@ CommandResponse Forwarder::SetPostcard(const bess::nft::FwdSetPostcardArg& arg) 
     return CommandSuccess();
 }
 
-CommandResponse Forwarder::AddGateGroup(cosnt bess::nft::FwdAddGateGroupArg &arg){
+CommandResponse Forwarder::AddGateGroup(const bess::nft::FwdAddGateGroupArg &arg){
     if(arg.type() != IGATE_T && arg.type() != EGATE_T){
         return CommandFailure(EINVAL, "invalid gate type");
     }
@@ -105,14 +52,21 @@ CommandResponse Forwarder::AddGateGroup(cosnt bess::nft::FwdAddGateGroupArg &arg
         return CommandFailure(EINVAL, "gate already exists");
     }
     _gate_groups[arg.igate_idx()] = {
-        .type = arg.type(),
-        .report_id = arg.report_id(),
-        .reset_interval = arg.rate_interval(),
-    }
+        .report_id = static_cast<uint8_t>(arg.report_id()),
+        .type = static_cast<uint8_t>(arg.type()),
+        .read_pos = sizeof(Ipv4) + sizeof(Ethernet),
+        .write_pos = sizeof(Ipv4) + sizeof(Ethernet),
+        .delimi_pos = sizeof(Ipv4) + sizeof(Ethernet) + sizeof(Udp),
+        .proto_type = PROTO_TYPE_ETH,
+        .count_pkt = 0,
+        .count_bytes = 0,
+        .reset_time = 0,
+        .reset_interval = static_cast<int>(arg.rate_interval()),
+    };
     return CommandSuccess();
 }
 
-CommandResponse Forwarder::ClearGateGroup(const bess::nft::EmptyArg &arg){
+CommandResponse Forwarder::ClearGateGroup(const bess::nft::EmptyArg&){
     _gate_groups.clear();
     return CommandSuccess();
 }
@@ -123,7 +77,7 @@ CommandResponse Forwarder::Init(const bess::nft::FwdArg& arg) {
 }
 
 inline INFTHeader* Forwarder::GetINFTHeader(gate_idx_t gate, bess::Packet *pkt){
-    return reinterpret_cast<INFTHeader*>(pkt->head_data<char*> + _gate_groups[gate].read_pos);
+    return reinterpret_cast<INFTHeader*>(pkt->head_data<char*>() + _gate_groups[gate].read_pos);
 }
 
 inline void Forwarder::TagTimeStamp(gate_idx_t gate, bess::Packet *pkt, uint64_t arrive_time){
@@ -232,13 +186,13 @@ void Forwarder::ProcessBatch(Context* ctx, bess::PacketBatch *batch){
     uint32_t current_us = tsc_to_us(rdtsc());
     if(it == _gate_groups.end()){
         //从未登记的门进入不做任何处理
-        bess::Packet.Free(batch);
+        bess::Packet::Free(batch);
         return;
     }
     int bytes_read = 0;
     for(int i = 0; i < batch->cnt(); ++i){
         bess::Packet *pkt = batch->pkts()[i];
-        INFTHeader *inft = pkt->head_data<char*>(it->second.read_pos);
+        INFTHeader *inft = reinterpret_cast<INFTHeader*>(pkt->head_data<char*>(it->second.read_pos));
         if(inft->preamble == MAGIC_NFT){
             //标记id，igress和egress
             INFTData *inft_data = reinterpret_cast<INFTData*>(
@@ -273,7 +227,7 @@ void Forwarder::ProcessBatch(Context* ctx, bess::PacketBatch *batch){
                 inft->length += 1;
             }
         }
-        bytes_read += pkt->data_enc();
+        bytes_read += pkt->data_len();
         RewriteCheck(igate, pkt);
         EmitPacket(ctx, pkt, igate);    //发送到对应的镜像出口
     }
@@ -288,13 +242,13 @@ void Forwarder::ProcessBatch(Context* ctx, bess::PacketBatch *batch){
     }
 }
 
-struct task_result Forwarder::RunTask(Context* ctx, bess::PacketBatch *batch, void* arg){
+struct task_result Forwarder::RunTask(Context* ctx, bess::PacketBatch *batch, void*){
     if(children_overload_ > 0){
         return {
                 .block = true, .packets = 0, .bits = 0,
         };
     }
-    uint32_t cnt = bess::Packet::Alloc(batch->pkts(), bess::PacketBatch::kMaxBurst, 100);
+    int cnt = bess::Packet::Alloc(batch->pkts(), bess::PacketBatch::kMaxBurst, 100);
     batch->set_cnt(cnt);
     int i = 0;
     int size_total = 0;
@@ -308,8 +262,9 @@ struct task_result Forwarder::RunTask(Context* ctx, bess::PacketBatch *batch, vo
         ++i;
         _que_pkts.pop();
         size_total += size;
+        EmitPacket(ctx, batch->pkts()[i], FORWARDER_POSTCARD_GATE);
     }
     return {.block = (cnt == 0),
-            .packets = cnt,
-            .bits = size_total * 8};
+            .packets = static_cast<uint32_t>(cnt),
+            .bits = static_cast<uint64_t>(size_total) * 8};
 }

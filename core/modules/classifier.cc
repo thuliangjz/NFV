@@ -10,7 +10,7 @@ using bess::utils::Udp;
 
 //各个参数的意义:在交互式环境(python)下调用Command时的函数，传入参数在protobuf中定义的名称，处理函数，是否是线程安全的
 
-const Command Classifier::cmds = {
+const Commands Classifier::cmds = {
     {"add_flow_spec", "ClsAddSpecArg", MODULE_CMD_FUNC(&Classifier::AddTeleSpec),
      Command::THREAD_UNSAFE},
     {"clear", "EmptyArg", MODULE_CMD_FUNC(&Classifier::Clear), 
@@ -21,7 +21,7 @@ Classifier::Classifier():Module(), _offset_insert(sizeof(Ethernet) + sizeof(Ipv4
 
 }
 
-CommandResponse Classifier::Init(const bess::nft::ClsArg& arg){
+CommandResponse Classifier::Init(const bess::nft::ClsArg&){
     return CommandSuccess();
 }
 
@@ -34,8 +34,10 @@ CommandResponse Classifier::AddTeleSpec(const bess::nft::ClsAddSpecArg& arg){
             .src_port = be16_t(static_cast<uint16_t>(spec.src_port())),
             .dst_port = be16_t(static_cast<uint16_t>(spec.dst_port())),
             .is_postcard = spec.is_postcard(),
+            .tele_types = {0},
+            .tele_index = 0,
             .tele_type_cnt = static_cast<char>(spec.tele_type_size()),
-            .tele_index = 0};
+        };
         for(int i = 0; i < spec.tele_type_size(); ++i){
             tmpSpec.tele_types[i] = static_cast<char>(spec.tele_type(i));
         }
@@ -44,7 +46,7 @@ CommandResponse Classifier::AddTeleSpec(const bess::nft::ClsAddSpecArg& arg){
     return CommandSuccess();
 }
 
-CommandResponse Classifier::Clear(const bess::nft::EmptyArg& arg){
+CommandResponse Classifier::Clear(const bess::nft::EmptyArg&){
     _specs.clear();
     return CommandSuccess();
 }
@@ -84,9 +86,9 @@ void Classifier::InsertProtocol(bess::Packet* pkt, Classifier::TelemetrySpec& sp
     h->version = 0;
     if(!spec.is_postcard){
     //采用轮转的方法指定测量参数同时对spec的计数器进行更新
-        h->type_metric = spec.tele_types[spec.tele_index];
+        h->type_metric = spec.tele_types[static_cast<int>(spec.tele_index)];
         ++spec.tele_index;
-        spec.tele_index = spec.tele_index >= spec.tele_tpye_cnt ?
+        spec.tele_index = spec.tele_index >= spec.tele_type_cnt ?
             0 : spec.tele_index;
         h->is_postcard = 0;
     }
