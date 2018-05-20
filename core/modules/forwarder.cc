@@ -13,11 +13,11 @@ using bess::utils::CopyInlined;
 using std::min;
 
 const Commands Forwarder::cmds = {
-    {"set_proto_rwm", "SetProtoRWM",
+    {"set_proto_rwm", "SetProtoRWMArg",
      MODULE_CMD_FUNC(&Forwarder::SetProtoRWM), Command::THREAD_UNSAFE},
-    {"set_postcard", "SetPostcard", 
+    {"set_postcard", "SetPostcardArg", 
      MODULE_CMD_FUNC(&Forwarder::SetPostcard), Command::THREAD_UNSAFE},
-     {"add_gate_group", "AddGateGroup", 
+     {"add_gate_group", "AddGateGroupArg", 
      MODULE_CMD_FUNC(&Forwarder::AddGateGroup), Command::THREAD_UNSAFE},
      {"clear_gate_group", "ClearGateGroup", 
      MODULE_CMD_FUNC(&Forwarder::ClearGateGroup), Command::THREAD_UNSAFE}
