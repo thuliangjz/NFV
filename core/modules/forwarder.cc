@@ -13,13 +13,13 @@ using bess::utils::CopyInlined;
 using std::min;
 
 const Commands Forwarder::cmds = {
-    {"set_proto_rwm", "SetProtoRWMArg",
+    {"set_proto_rwm", "FwdSetProtoRWMArg",
      MODULE_CMD_FUNC(&Forwarder::SetProtoRWM), Command::THREAD_UNSAFE},
-    {"set_postcard", "SetPostcardArg", 
+    {"set_postcard", "FwdSetPostcardArg", 
      MODULE_CMD_FUNC(&Forwarder::SetPostcard), Command::THREAD_UNSAFE},
-     {"add_gate_group", "AddGateGroupArg", 
+     {"add_gate_group", "FwdAddGateGroupArg", 
      MODULE_CMD_FUNC(&Forwarder::AddGateGroup), Command::THREAD_UNSAFE},
-     {"clear_gate_group", "ClearGateGroup", 
+     {"clear_gate_group", "NFTEmptyArg", 
      MODULE_CMD_FUNC(&Forwarder::ClearGateGroup), Command::THREAD_UNSAFE}
 };
 
@@ -81,7 +81,7 @@ CommandResponse Forwarder::ClearGateGroup(const bess::nft::NFTEmptyArg&){
     return CommandSuccess();
 }
 
-CommandResponse Forwarder::Init(const bess::nft::FwdArg& arg) {
+CommandResponse Forwarder::Init(const bess::nft::ForwarderArg& arg) {
     _id = arg.id();
     return CommandSuccess();
 }
@@ -198,7 +198,7 @@ void Forwarder::ProcessBatch(Context* ctx, bess::PacketBatch *batch){
     //从入口处获取信息
     gate_idx_t igate = ctx->current_igate;
     auto it = _gate_groups.find(igate);
-    uint32_t current_us = tsc_to_us(rdtsc());
+    uint32_t current_us = 0;//tsc_to_us(rdtsc());
     if(it == _gate_groups.end()){
         //从未登记的门进入不做任何处理
         bess::Packet::Free(batch);
@@ -244,16 +244,17 @@ void Forwarder::ProcessBatch(Context* ctx, bess::PacketBatch *batch){
         }
         bytes_read += pkt->data_len();
         RewriteCheck(igate, pkt);
-        EmitPacket(ctx, pkt, igate);    //发送到对应的镜像出口
+        //EmitPacket(ctx, pkt, igate);    //发送到对应的镜像出口
     }
+    RunChooseModule(ctx, igate, batch);
     it->second.count_bytes += bytes_read;
     it->second.count_pkt += batch->cnt();
-    double now = tsc_to_us(rdtsc());
-    if(now - it->second.reset_time > it->second.reset_interval){
+    //double now = tsc_to_us(rdtsc());
+    if(ctx->current_ns - it->second.reset_time > it->second.reset_interval){
         //重置
         it->second.count_bytes = 0;
         it->second.count_pkt = 0;
-        it->second.reset_time = now;
+        it->second.reset_time = ctx->current_ns;
     }
 }
 
@@ -283,3 +284,5 @@ struct task_result Forwarder::RunTask(Context* ctx, bess::PacketBatch *batch, vo
             .packets = static_cast<uint32_t>(cnt),
             .bits = static_cast<uint64_t>(size_total) * 8};
 }
+
+ADD_MODULE(Forwarder, "forwarder", "forwarder for NFT architecture") 

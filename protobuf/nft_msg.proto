@@ -23,7 +23,7 @@ message ClsAddSpecArg {
     repeated Spec specs = 1;
 }
 
-message FwdArg {
+message ForwarderArg {
     uint32 id = 1;
 }
 

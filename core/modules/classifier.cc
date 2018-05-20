@@ -63,7 +63,7 @@ void Classifier::ProcessBatch(Context* ctx, bess::PacketBatch *batch){
         size_t ip_bytes = ip->header_length << 2;
         Udp *udp = reinterpret_cast<Udp *>(reinterpret_cast<uint8_t *>(ip) + ip_bytes);
 
-        for(auto &spec : _specs){
+        for(const auto &spec : _specs){
             if(spec.Match(ip->src, ip->dst, udp->src_port, udp->dst_port)){
                 InsertProtocol(pkt, spec);
                 break;

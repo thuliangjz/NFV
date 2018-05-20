@@ -24,7 +24,7 @@ class Forwarder final : public Module {
     public:
         Forwarder(): Module(){}
         static const Commands cmds;
-        CommandResponse Init(const bess::nft::FwdArg &arg);
+        CommandResponse Init(const bess::nft::ForwarderArg &arg);
         CommandResponse SetProtoRWM(const bess::nft::FwdSetProtoRWMArg &arg);
         CommandResponse SetPostcard(const bess::nft::FwdSetPostcardArg& arg);
         CommandResponse AddGateGroup(const bess::nft::FwdAddGateGroupArg& arg);

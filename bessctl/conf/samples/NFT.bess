@@ -11,27 +11,27 @@ def gen_packet(proto, src_ip, dst_ip):
 
 packets = [
     gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
-    gen_packet(scapy.UDP, '180.16.300.2', '20.20.20.0'),
+    gen_packet(scapy.UDP, '180.16.255.2', '20.20.20.0'),
     gen_packet(scapy.UDP, '192.168.1.123', '12.34.56.78'),
-    gen_packet(scapy.UDP, '180.19.300.2', '20.20.20.0'),
-    gen_packet(scapy.UDP, '180.17.300.2', '20.20.20.0'),
+    gen_packet(scapy.UDP, '180.19.255.2', '20.20.20.0'),
+    gen_packet(scapy.UDP, '180.17.255.2', '20.20.20.0'),
     ]
 
-#第一版：正常情况：classifier通过forwarder之后进入acl，forwarder有两个镜像端口,只测试INFT的能力
+#only test for ACL with single forward input and output mirror
 cls::Classifier()
 fwd::Forwarder(id = 1)
-acl::ACL(rules=[{'src_ip': '172.12.0.0/16', 'drop': False}])
+acl::ACL(rules=[{'src_ip': '172.16.0.0/16', 'drop': False}])
 
 FORWARDER_IGATE = 0
 FORWARDER_EGATE = 1
-cls.add_flow_spec(specs = [src_ip:"172.16.0.0/16",is_postcard:False, tele_type:[0,1,2]])
+#cls.add_flow_spec(specs = [{'src_ip':"172.16.0.0/16",'is_postcard':False, 'tele_type':[1,]},])
 gate_groups = [
-    {type:FORWARDER_IGATE, igate_idx:0, report_id:0, rate_interval:100},
-    {type:FORWARDER_EGATE, igate_idx:1, report_id:1, rate_interval:100},
+    {'type':FORWARDER_IGATE, 'igate_idx':0, 'report_id':0, 'rate_interval':1000000},
+    {'type':FORWARDER_EGATE, 'igate_idx':1, 'report_id':1, 'rate_interval':1000000},
 ]
 for i in gate_groups:
-    fwd.add_gate_group(**gate_groups[i])
-#forwarder的其余参数都是默认配置好的
+    fwd.add_gate_group(**i)
+#other parameters are default configurations in forwarder.cc
 
 Source() -> Rewrite(templates = packets) -> cls
 cls:0 -> 0:fwd

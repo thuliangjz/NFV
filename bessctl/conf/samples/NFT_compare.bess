@@ -1,0 +1,35 @@
+import scapy.all as scapy
+
+# Craft a packet with the specified IP addresses
+def gen_packet(proto, src_ip, dst_ip):
+    eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
+    ip = scapy.IP(src=src_ip, dst=dst_ip)
+    udp = proto(sport=10001, dport=10002)
+    payload = 'helloworld'
+    pkt = eth/ip/udp/payload
+    return bytes(pkt)
+
+
+packets = [gen_packet(scapy.UDP, '180.%s.255.2'%(str(i)), '20.20.20.0') for i in range(1, 20) ]
+
+#only test for ACL with single forward input and output mirror
+acl::ACL(rules = [{'src_ip': '180.%s.0.0/16'%(str(i)), 'drop':False} for i in(range(100,110) + range(5, 20))])
+
+#acl1::ACL(rules = [{'src_ip': '180.%s.0.0/16'%(str(i)), 'drop':False} for i in range(6, 7)])
+
+#acl2::ACL(rules = [{'src_ip': '180.%s.0.0/16'%(str(i)), 'drop':False} for i in range(15, 35)])
+
+#fwd::Forwarder(id = 1)
+
+FORWARDER_IGATE = 0
+FORWARDER_EGATE = 1
+
+#cls::Classifier()
+#cls.add_flow_spec(specs = [
+#{'src_ip':"180.10.0.0/16",'is_postcard':False, 'tele_type':[1,]},
+#])
+#other parameters are default configurations in forwarder.cc
+
+Source() -> Rewrite(templates = packets)  -> acl -> Sink()
+#Source() -> Rewrite(templates = packets) -> cls  -> acl -> Sink()
+
