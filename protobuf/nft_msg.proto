@@ -28,18 +28,23 @@ message FwdArg {
 }
 
 /*
-igate_idx表示镜像组中进入forwarder的那个gate的id,必须是偶数
+igate_idx表示镜像组中进入forwarder的那个gate的id
 read_pos　igate_idx读入read_pos的那个gate读入position的位置
 write_pos igate_dx + 1发射出去时是否需要修改protocol的位置
+modify_pos 发送出去INFT数据包时可能需要修改其它域的值，用这个变量记录修改位置
+modify_content 修改的内容，每一位都当做char来用
 */
-message FwdSetProtoRWPosArg {
+message FwdSetProtoRWMArg {
     uint32 igate_idx = 1;
     uint32 read_pos = 2;
     uint32 write_pos = 3;
+    bool modify = 4;
+    uint32 modify_pos = 5;
+    bytes modify_content = 6;
 }
 
 /*
-igate_idx: 镜像组中进入forwarder的gateid，必须是偶数
+igate_idx: 镜像组中进入forwarder的gateid
 delimi_pos: 从这个端口进入的数据包的包头截止到哪里（不包含INFT_protocol时的位置）
 protocol_number: 从这个端口发出去的数据包的包头第一层协议的协议编号
 */
@@ -52,7 +57,7 @@ message FwdSetPostcardArg {
 
 /*
 type表示为入口镜像组还是出口镜像组
-igate_idx必须为偶数,+1表示离开forwarder的端口的id
+igate_idx也表示离开forwarder的端口的id
 report_id是在INFT报告中的igress_id或者egress_id
 rate_interval是该节点统计速率时间间隔,以微秒为单位
 */

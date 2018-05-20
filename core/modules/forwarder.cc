@@ -13,8 +13,8 @@ using bess::utils::CopyInlined;
 using std::min;
 
 const Commands Forwarder::cmds = {
-    {"set_proto_rw_pos", "SetProtoRWPos",
-     MODULE_CMD_FUNC(&Forwarder::SetProtoRWPos), Command::THREAD_UNSAFE},
+    {"set_proto_rwm", "SetProtoRWM",
+     MODULE_CMD_FUNC(&Forwarder::SetProtoRWM), Command::THREAD_UNSAFE},
     {"set_postcard", "SetPostcard", 
      MODULE_CMD_FUNC(&Forwarder::SetPostcard), Command::THREAD_UNSAFE},
      {"add_gate_group", "AddGateGroup", 
@@ -23,13 +23,19 @@ const Commands Forwarder::cmds = {
      MODULE_CMD_FUNC(&Forwarder::ClearGateGroup), Command::THREAD_UNSAFE}
 };
 
-CommandResponse Forwarder::SetProtoRWPos(const bess::nft::FwdSetProtoRWPosArg &arg){
+CommandResponse Forwarder::SetProtoRWM(const bess::nft::FwdSetProtoRWMArg &arg){
     auto it = _gate_groups.find(arg.igate_idx());
     if(it == _gate_groups.end()){
         return CommandFailure(EINVAL, "gate doesnot exist");
     }
+    if(arg.modify_content().length() > FORWARDER_MAX_MODIFY_LENGTH){
+        return CommandFailure(EINVAL, "modify content too long");
+    }
     it->second.read_pos = arg.read_pos();
     it->second.write_pos = arg.write_pos();
+    it->second.modify = arg.modify();
+    it->second.modify_pos = static_cast<int>(arg.modify_pos());
+    it->second.modify_content = arg.modify_content();
     return CommandSuccess();
 }
 
@@ -51,6 +57,7 @@ CommandResponse Forwarder::AddGateGroup(const bess::nft::FwdAddGateGroupArg &arg
     if(it != _gate_groups.end()){
         return CommandFailure(EINVAL, "gate already exists");
     }
+    std::string s;
     _gate_groups[arg.igate_idx()] = {
         .report_id = static_cast<uint8_t>(arg.report_id()),
         .type = static_cast<uint8_t>(arg.type()),
@@ -58,6 +65,9 @@ CommandResponse Forwarder::AddGateGroup(const bess::nft::FwdAddGateGroupArg &arg
         .write_pos = sizeof(Ipv4) + sizeof(Ethernet),
         .delimi_pos = sizeof(Ipv4) + sizeof(Ethernet) + sizeof(Udp),
         .proto_type = PROTO_TYPE_ETH,
+        .modify = false,
+        .modify_pos = 0,
+        .modify_content = s,
         .count_pkt = 0,
         .count_bytes = 0,
         .reset_time = 0,
@@ -166,17 +176,22 @@ void Forwarder::CopyPacketHeader(gate_idx_t gate, char* dst, bess::Packet *pkt){
 
 void Forwarder::RewriteCheck(gate_idx_t gate, bess::Packet *pkt){
     const auto &gate_info = _gate_groups[gate];
-    if(gate_info.read_pos == gate_info.write_pos)
-        return;
-    Copy(_rewrite_buffer, pkt->head_data<char*>(gate_info.read_pos), LENGTH_INFT);
-    //因为存在移动，所以使用memmove
-    memmove(pkt->head_data<char*>(gate_info.read_pos),
-        pkt->head_data<char*>(gate_info.read_pos + LENGTH_INFT),
-        pkt->data_len() - gate_info.read_pos - LENGTH_INFT);
-    memmove(pkt->head_data<char*>(gate_info.write_pos + LENGTH_INFT), 
-        pkt->head_data<char*>(gate_info.write_pos),
-        pkt->data_len() - gate_info.write_pos - LENGTH_INFT);
-    Copy(pkt->head_data<char*>(gate_info.write_pos), _rewrite_buffer, LENGTH_INFT);
+    if(gate_info.read_pos != gate_info.write_pos){
+        Copy(_rewrite_buffer, pkt->head_data<char*>(gate_info.read_pos), LENGTH_INFT);
+        //因为存在移动，所以使用memmove
+        memmove(pkt->head_data<char*>(gate_info.read_pos),
+            pkt->head_data<char*>(gate_info.read_pos + LENGTH_INFT),
+            pkt->data_len() - gate_info.read_pos - LENGTH_INFT);
+        memmove(pkt->head_data<char*>(gate_info.write_pos + LENGTH_INFT), 
+            pkt->head_data<char*>(gate_info.write_pos),
+            pkt->data_len() - gate_info.write_pos - LENGTH_INFT);
+        Copy(pkt->head_data<char*>(gate_info.write_pos), _rewrite_buffer, LENGTH_INFT);
+    }
+    //重写
+    if(gate_info.modify){
+        Copy(pkt->head_data<char*>(gate_info.modify_pos), gate_info.modify_content.c_str(), 
+        gate_info.modify_content.length());
+    }
 }
 
 void Forwarder::ProcessBatch(Context* ctx, bess::PacketBatch *batch){

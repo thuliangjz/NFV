@@ -9,8 +9,15 @@ def gen_packet(proto, src_ip, dst_ip):
     pkt = eth/ip/udp/payload
     return bytes(pkt)
 
-packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),]
+packets = [
+    gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
+    gen_packet(scapy.UDP, '180.16.300.2', '20.20.20.0'),
+    ]
 
-c::Classifier(version=0)
+cls::Classifier()
+fwd::Forwarder(id = 1)
+
+cls.add_flow_spec([src_ip:"172.16.0.0/16",is_postcard:False, tele_type:[0,1,2]])
+
 
 Source() -> Rewrite(templates=packets) -> c -> Sink()

@@ -2,6 +2,8 @@
 #define FORWARDER_H
 #include <map>
 #include<queue>
+#include<vector>
+#include<string>
 #include "../module.h"
 #include "nft.h"
 #include "../pb/nft_msg.pb.h"
@@ -11,6 +13,8 @@
 #define EGATE_T 1
 
 #define FORWARDER_BUFFER_SIZE 1048576
+#define FORWARDER_MAX_MODIFY_LENGTH 40
+
 
 using bess::utils::be16_t;
 using bess::utils::be32_t;
@@ -21,7 +25,7 @@ class Forwarder final : public Module {
         Forwarder(): Module(){}
         static const Commands cmds;
         CommandResponse Init(const bess::nft::FwdArg &arg);
-        CommandResponse SetProtoRWPos(const bess::nft::FwdSetProtoRWPosArg &arg);
+        CommandResponse SetProtoRWM(const bess::nft::FwdSetProtoRWMArg &arg);
         CommandResponse SetPostcard(const bess::nft::FwdSetPostcardArg& arg);
         CommandResponse AddGateGroup(const bess::nft::FwdAddGateGroupArg& arg);
         CommandResponse ClearGateGroup(const bess::nft::NFTEmptyArg& arg);
@@ -42,6 +46,10 @@ class Forwarder final : public Module {
             uint32_t write_pos;     //写入INFT header的位置
             uint32_t delimi_pos;    //生成postcard是截断位置(不包含INFT_protocol)
             uint32_t proto_type;    //包头的第一层协议类型
+            bool modify;            //是否需要修改其它内容
+            uint32_t modify_pos;    //修改位置
+            std::string modify_content;  //修改多少
+            
 
             //统计数据
             int count_pkt;
