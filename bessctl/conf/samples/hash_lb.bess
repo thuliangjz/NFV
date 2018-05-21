@@ -57,8 +57,8 @@ if mode == 'vlan':
 else:
     rewrite \
       -> RandomUpdate(fields=[{'offset': 34, 'size': 2, 'min': 1, 'max': 1023}]) \
-      -> hlb::HashLB(gates=[0, 1, 2], mode=mode)
+      ->t1::Timer(type=0) ->hlb::HashLB(gates=[0, 1, 2], mode=mode)
 
-hlb:0 -> Sink()
+hlb:0->t2::Timer(type=1)->ts::TimerStat(interval=20000000) -> Sink()
 hlb:1 -> Sink()
 hlb:2 -> Sink()

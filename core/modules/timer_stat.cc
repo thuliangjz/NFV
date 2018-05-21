@@ -18,7 +18,7 @@ class TimerStat final : public Module {
         void ProcessBatch(Context *ctx, bess::PacketBatch *batch);
     private:
         uint32_t _print_interval;
-        int _packet_count;
+        uint64_t _packet_count;
         uint64_t _clock_total;
         double _last_reset;
 };
@@ -37,16 +37,21 @@ void TimerStat::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     int cnt = batch->cnt();
     if(cnt){
         bess::Packet *pkt = batch->pkts()[0];
-        uint64_t clk = get_attr<uint64_t>(this, ATTR_R_TIMESTAME_E, pkt);  
-        clk -= get_attr<uint64_t>(this, ATTR_R_TIMESTAME_S, pkt);
+        //uint64_t clk = get_attr<uint64_t>(this, ATTR_R_TIMESTAME_E, pkt);  
+        //clk -= get_attr<uint64_t>(this, ATTR_R_TIMESTAME_S, pkt);
+        uint64_t clk = get_attr_with_offset<uint64_t>(8, pkt);
+        clk -= get_attr_with_offset<uint64_t>(0, pkt);
         _clock_total += clk; 
-        _packet_count += get_attr<uint32_t>(this, 2, pkt);
+        _packet_count += get_attr_with_offset<uint64_t>(16, pkt);
         //如果超过一定的时间间隔则更新_last_reset
         if(current_time -  _last_reset > (double)_print_interval){
             printf("+++++++++++++++++++++++++++++++++++++++\n");
             //std::cout<<static_cast<double>(_clock_total) / _packet_count<<std::endl;
+            double cpp =  (double)_clock_total / _packet_count;
             cout<<_clock_total<<endl;
             cout<<_packet_count<<endl;
+            cout<<cpp<<endl;
+            cout<<tsc_to_us(cpp)<<endl;
             printf("+++++++++++++++++++++++++++++++++++++++\n");
             _last_reset = current_time;
             _clock_total = 0;

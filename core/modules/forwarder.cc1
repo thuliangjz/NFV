@@ -49,7 +49,6 @@ CommandResponse Forwarder::SetPostcard(const bess::nft::FwdSetPostcardArg& arg) 
     return CommandSuccess();
 }
 
-
 CommandResponse Forwarder::AddGateGroup(const bess::nft::FwdAddGateGroupArg &arg){
     if(arg.type() != IGATE_T && arg.type() != EGATE_T){
         return CommandFailure(EINVAL, "invalid gate type");
@@ -385,40 +384,7 @@ void Forwarder::ProcessBatch(Context* ctx, bess::PacketBatch *batch){
        bytes_read += pkt1->data_len();
     }
     */
-    /*
-    //复制移位(3次复制)
-    gate_idx_t igate = ctx->current_igate;
-    const uint16_t src = 70, sz = 8;
-    const uint16_t read_pos = 34, write_pos = 42;
-    const uint16_t cnt = batch->cnt();
-    char proto_buffer[40];
-    for(int i = 0; i < cnt; ++i){
-        bess::Packet *pkt = batch->pkts()[i];
-        bess::utils::CopyInlined(proto_buffer,pkt->head_data<char*>(read_pos), LENGTH_INFT);
-        bess::utils::CopySmall(pkt->head_data<char*>(read_pos), pkt->head_data<char*>(src), sz);
-        bess::utils::CopySmall(pkt->head_data<char*>(write_pos), proto_buffer, LENGTH_INFT);
-    }*/
 
-    gate_idx_t igate = ctx->current_igate;
-    const uint32_t current_us = tsc_to_us(rdtsc());
-    const uint16_t sz_head = 78;
-    const int cnt = batch->cnt();
-    for(int i = 0; i < cnt; ++i) {
-        bess::Packet *pkt = batch->pkts()[i];
-        bess::Packet *pkt_postcard = bess::Packet::Alloc();
-        if(!pkt_postcard){
-            break;
-        }
-        pkt_postcard->set_data_off(SNBUF_HEADROOM);
-        pkt_postcard->set_total_len(sizeof(PostcardHeader) + sz_head);
-        pkt_postcard->set_data_len(sizeof(PostcardHeader) + sz_head);
-        PostcardHeader* ph = reinterpret_cast<PostcardHeader*>(pkt_postcard->head_data<char*>());
-        ph->igress = igate;
-        ph->seq = _seq_postcard_nxt++;
-        ph->leave_time = current_us;
-        bess::utils::CopyInlined(ph + 1, pkt->head_data(), sz_head);
-        EmitPacket(ctx, pkt, FORWARDER_POSTCARD_GATE);
-    }
     /*
     //统计信息更新 
     it->second.count_bytes += bytes_read;

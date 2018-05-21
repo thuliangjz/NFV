@@ -55,12 +55,14 @@ pkts = [gen_packet('172.16.100.1', 80),
 wm::WildcardMatch(fields=[{'offset':30, 'num_bytes':4},
                           {'offset':36, 'num_bytes':2},
                           {'attr_name':'in_port', 'num_bytes':2}])
-
+t1::Timer(type=0)
 # locally emulate two input ports
-Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 1}]) -> Rewrite(templates=pkts) -> wm
-Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 2}]) -> Rewrite(templates=pkts) -> wm
+Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 1}]) -> Rewrite(templates=pkts) -> t1
+Source() -> SetMetadata(attrs=[{'name': 'in_port', 'size': 2, 'value_int': 2}]) -> Rewrite(templates=pkts) -> t1
 
-wm:0 -> Sink()
+t1-> wm
+
+wm:0 -> t2::Timer(type=1)-> ts::TimerStat(interval=20000000) -> Sink()
 wm:1 -> Sink()
 wm:2 -> Sink()
 wm:3 -> Sink()

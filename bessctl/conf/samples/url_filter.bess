@@ -40,9 +40,9 @@ pkt = bytes(eth/ip/tcp/payload)
 src::FlowGen(template=pkt, pps=2.2e6, flow_rate=800, flow_duration=5.0, \
     arrival='uniform', duration='uniform', quick_rampup=False)
 
-blacklist_rules = [{'host': 'www.%d.com' % i, 'path': '/'} for i in range(100)]
+blacklist_rules = [{'host': 'www.%d.com' % i, 'path': '/'} for i in range(100)] + [{'host':'www.google.com', 'path':'/'}]
 filter::UrlFilter(blacklist=blacklist_rules)
 
-src -> 0:filter
-filter:0 -> Sink()
+src -> t1::Timer(type=0)->0:filter
+filter:0 -> t2::Timer(type=1) ->ts::TimerStat(interval=20000000)
 filter:1 -> Sink()

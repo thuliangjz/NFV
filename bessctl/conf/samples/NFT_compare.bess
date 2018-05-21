@@ -10,26 +10,41 @@ def gen_packet(proto, src_ip, dst_ip):
     return bytes(pkt)
 
 
-packets = [gen_packet(scapy.UDP, '180.%s.255.2'%(str(i)), '20.20.20.0') for i in range(1, 20) ]
+packets = [gen_packet(scapy.UDP, '180.%s.255.2'%(str(i)), '20.20.20.0') for i in range(10, 11) ]
 
 #only test for ACL with single forward input and output mirror
-acl::ACL(rules = [{'src_ip': '180.%s.0.0/16'%(str(i)), 'drop':False} for i in(range(100,110) + range(5, 20))])
 
 #acl1::ACL(rules = [{'src_ip': '180.%s.0.0/16'%(str(i)), 'drop':False} for i in range(6, 7)])
 
 #acl2::ACL(rules = [{'src_ip': '180.%s.0.0/16'%(str(i)), 'drop':False} for i in range(15, 35)])
 
-#fwd::Forwarder(id = 1)
+#acl::ACL(rules = [{'src_ip': '180.%s.0.0/16'%(str(i)), 'drop':False} for i in(range(100,110) + range(5, 20))])
 
 FORWARDER_IGATE = 0
 FORWARDER_EGATE = 1
 
-#cls::Classifier()
-#cls.add_flow_spec(specs = [
-#{'src_ip':"180.10.0.0/16",'is_postcard':False, 'tele_type':[1,]},
-#])
+cls::Classifier()
+cls.add_flow_spec(specs = [
+{'src_ip':"180.10.0.0/16",'is_postcard':False, 'tele_type':[1,2]},
+])
+
+fwd::Forwarder(id = 1)
+fwd.add_gate_group(**{'igate_idx':0, 'report_id':0, 'type':FORWARDER_IGATE,'rate_interval': 100000000})
+fwd.add_gate_group(**{'igate_idx':1, 'report_id':1, 'type':FORWARDER_EGATE,'rate_interval': 100000000})
+
+
+acl::ACL(rules = [{'src_ip': '180.%s.0.0/16'%(str(i)), 'drop':False} for i in(range(5, 15))])
+
 #other parameters are default configurations in forwarder.cc
 
-Source() -> Rewrite(templates = packets)  -> acl -> Sink()
+Source() \
+    -> Rewrite(templates = packets)  \
+    -> cls\
+    -> t1::Timer(type=0)\
+    -> 0:fwd
+fwd:0 -> 0:acl
+acl:0 -> 1:fwd
+fwd:1 -> Sink()
+fwd:16 -> t2::Timer(type=1) -> ts::TimerStat(interval=20000000)-> Sink()
 #Source() -> Rewrite(templates = packets) -> cls  -> acl -> Sink()
 
