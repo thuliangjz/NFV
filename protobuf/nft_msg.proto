@@ -67,3 +67,12 @@ message FwdAddGateGroupArg {
     uint32 report_id = 3;
     uint32 rate_interval = 4;
 }
+
+//type=0表示进入 offset用S，type=1表示出口，offset用E
+message TimerArg {
+    uint32 type = 1;    
+}
+
+message TimerStatArg {
+    uint32 interval = 1;    
+}

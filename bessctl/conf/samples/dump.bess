@@ -10,6 +10,6 @@ def gen_packet(proto, src_ip, dst_ip):
 
 packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),]
 
-dmp::Dump(interval = 10)
+dmp::Dump(interval = 20)
 
 Source() -> Rewrite(templates=packets) -> dmp -> Sink()

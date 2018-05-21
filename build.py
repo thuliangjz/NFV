@@ -405,7 +405,7 @@ def build_bess():
     cmd('bin/bessctl daemon stop 2> /dev/null || true', shell=True)
     cmd('rm -f core/bessd')  # force relink as DPDK might have been rebuilt
     nproc = int(cmd('nproc', quiet=True))
-    cmd('make -C core -j%d' % nproc)
+    cmd('make -C core -j%d DEBUG=TRUE' % nproc)
     cmd('ln -f -s ../core/bessd bin/bessd')
 
 
